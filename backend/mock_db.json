@@ -1,0 +1,23 @@
+{
+    "patients": [
+        {
+            "id": 101,
+            "name": "John Doe",
+            "assigned_exercises": [
+                1
+            ]
+        }
+    ],
+    "prescribed_exercises": [
+        {
+            "id": 1,
+            "name": "Squat",
+            "target_angles": {
+                "knee": "< 90",
+                "hip": "< 100"
+            }
+        }
+    ],
+    "session_logs": [],
+    "messages": []
+}
