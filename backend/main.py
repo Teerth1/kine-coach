@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import ExerciseTarget, SessionPayload, ProviderMessage
+import database as db
 
 app = FastAPI(title="Kine-Coach API")
 
@@ -80,6 +81,9 @@ async def process_session(payload: SessionPayload):
     # Print the received payload to the console
     print(f"Received SessionPayload: {payload.model_dump()}")
     
+    # Hand off to Database Engineer's layer
+    db.save_session(payload.model_dump())
+    
     # Generate the actual Gemini report
     report = await generate_gemini_report(payload)
     
@@ -92,5 +96,8 @@ async def send_message(payload: ProviderMessage):
     """
     # Print the received payload to the console
     print(f"Received ProviderMessage: {payload.model_dump()}")
+    
+    # Hand off to Database Engineer's layer
+    db.save_message(payload.model_dump())
     
     return {"status": "success", "message": "Message received"}
