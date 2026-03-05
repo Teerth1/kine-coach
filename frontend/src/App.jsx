@@ -13,6 +13,7 @@ export default function App() {
     perfect_reps: 0,
     shallow_reps: 0,
     fatigue_data: [], // E.g., timestamp lengths per rep
+    rom_data: [], // Deepest knee angle per rep
     pain_level: 2, // Hardcoded for this demo
     quiz_answers: "Felt great, pushed hard."
   });
@@ -34,7 +35,8 @@ export default function App() {
       total_reps_attempted: prev.total_reps_attempted + 1,
       perfect_reps: result.quality === 'PERFECT' ? prev.perfect_reps + 1 : prev.perfect_reps,
       shallow_reps: result.quality === 'SHALLOW' ? prev.shallow_reps + 1 : prev.shallow_reps,
-      fatigue_data: [...prev.fatigue_data, result.stats.durationMs || 0]
+      fatigue_data: [...prev.fatigue_data, result.stats.durationMs || 0],
+      rom_data: [...prev.rom_data, result.stats.depth || 180]
     }));
   };
 

@@ -12,6 +12,7 @@ class SessionPayload(BaseModel):
     perfect_reps: int = Field(..., description="Number of perfect reps")
     shallow_reps: int = Field(..., description="Number of shallow reps")
     fatigue_data: List[float] = Field(..., description="Array of time per rep in seconds")
+    rom_data: List[float] = Field(..., description="Array of lowest knee angles per rep")
     pain_level: int = Field(..., ge=0, le=10, description="Pain level reported by the patient (0-10)")
     quiz_answers: str = Field(..., description="Answers to the end-of-session quiz")
 

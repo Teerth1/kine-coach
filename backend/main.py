@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from schemas import ExerciseTarget, SessionPayload, ProviderMessage
 import database as db
+from fpdf import FPDF
 
 app = FastAPI(title="Kine-Coach API")
 
@@ -119,3 +121,53 @@ async def fetch_patient_sessions(patient_id: int):
         return []
         
     return sessions
+
+@app.get("/api/sessions/{patient_id}/pdf")
+async def generate_pdf_summary(patient_id: int):
+    """
+    Generates a printable PDF medical summary for insurance providers.
+    """
+    sessions = db.get_patient_sessions(patient_id)
+    if not sessions:
+        raise HTTPException(status_code=404, detail="No sessions found for this patient.")
+        
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt=f"Medical Summary Report - Patient {patient_id}", ln=True, align="C")
+    
+    pdf.set_font("Arial", size=12)
+    pdf.ln(10)
+    
+    total_reps = sum(s.get("total_reps_attempted", 0) for s in sessions)
+    avg_score = sum(s.get("adherence_score", 0) for s in sessions) / len(sessions)
+    
+    pdf.cell(200, 10, txt=f"Total Sessions: {len(sessions)}", ln=True)
+    pdf.cell(200, 10, txt=f"Total Reps Attempted All-Time: {total_reps}", ln=True)
+    pdf.cell(200, 10, txt=f"Average Adherence Score: {avg_score:.2f}%", ln=True)
+    pdf.ln(10)
+    
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(200, 10, txt="Session History (Last 5):", ln=True)
+    pdf.set_font("Arial", size=12)
+    
+    for s in sessions[-5:]: # Last 5 sessions
+        date = s.get("timestamp", "Unknown Date")[:10]
+        score = s.get("adherence_score", 0)
+        reps = s.get("total_reps_attempted", 0)
+        pain = s.get("pain_level", 0)
+        pdf.cell(200, 10, txt=f"- Date: {date} | Score: {score}% | Reps: {reps} | Pain: {pain}/10", ln=True)
+        
+    pdf.ln(20)
+    pdf.set_font("Arial", 'I', 10)
+    from datetime import datetime
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pdf.cell(200, 10, txt=f"Report Generated: {current_time}", ln=True)
+    pdf.ln(10)
+    pdf.line(10, pdf.get_y(), 100, pdf.get_y())
+    pdf.ln(2)
+    pdf.cell(200, 10, txt="Physical Therapist Signature", ln=True)
+    
+    pdf_content = pdf.output(dest='S').encode('latin1')
+    
+    return Response(content=pdf_content, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=patient_{patient_id}_summary.pdf"})
