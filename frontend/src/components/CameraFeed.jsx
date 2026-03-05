@@ -7,7 +7,7 @@ export default function CameraFeed({ onRepCompleted }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const workerRef = useRef(null);
-    const [trackingData, setTrackingData] = useState({ kneeAngle: 0, phase: 'STANDING' });
+    const [trackingData, setTrackingData] = useState({ kneeAngle: 0, hipAngle: 0, phase: 'STANDING' });
 
     useEffect(() => {
         // 1. Initialize the AI Web Worker instance
@@ -16,8 +16,8 @@ export default function CameraFeed({ onRepCompleted }) {
         workerRef.current.onmessage = (e) => {
             const data = e.data;
             if (data.type === 'TRACKING_UPDATE') {
-                // Update local React state with the latest knee angle from the physics engine
-                setTrackingData({ kneeAngle: data.angles.knee, phase: data.phase });
+                // Update local React state with the latest knee and hip angles from the physics engine
+                setTrackingData({ kneeAngle: Math.round(data.angles.knee), hipAngle: Math.round(data.angles.hip), phase: data.phase });
             } else if (data.type === 'REP_COMPLETED') {
                 // Fire event up to parent Dashboard with stats (Perfect vs Shallow)
                 if (onRepCompleted) onRepCompleted(data);
@@ -105,6 +105,10 @@ export default function CameraFeed({ onRepCompleted }) {
             <div className="absolute top-6 right-6 z-10 bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 min-w-[200px]">
                 <p className="text-gray-300 text-sm font-semibold uppercase tracking-wider mb-2">Current Phase</p>
                 <p className="text-white text-2xl font-black">{trackingData.phase}</p>
+                <p className="text-gray-300 text-sm font-semibold uppercase tracking-wider mb-2">Hip Angle</p>
+                <p className="text-blue-400 text-4xl font-black drop-shadow-md mb-4">
+                    {trackingData.hipAngle}°
+                </p>
                 <div className="h-px bg-white/20 my-4" />
                 <p className="text-gray-300 text-sm font-semibold uppercase tracking-wider mb-2">Knee Angle</p>
                 <p className="text-yellow-400 text-5xl font-black drop-shadow-md">
