@@ -11,7 +11,7 @@ export default function CameraFeed({ onRepCompleted }) {
 
     useEffect(() => {
         // 1. Initialize the AI Web Worker instance
-        workerRef.current = new Worker(new URL('../../../cv-model/poseWorker.js', import.meta.url), { type: 'module' });
+        workerRef.current = new Worker(new URL('../cv-model/poseWorker.js', import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (e) => {
             const data = e.data;
@@ -113,7 +113,7 @@ export default function CameraFeed({ onRepCompleted }) {
             </div>
 
             {/* Hidden Video (MediaPipe engine reads from this) */}
-            <video ref={videoRef} className="hidden" playsInline />
+            <video ref={videoRef} className="hidden" playsInline autoPlay muted />
 
             {/* Visible Canvas (Paints the skeleton wires over the webcam) */}
             <canvas
