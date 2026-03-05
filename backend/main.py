@@ -18,7 +18,13 @@ app.add_middleware(
 async def get_exercise_target(exercise_id: int):
     """
     Returns dummy target angle data to inject into the frontend AI.
+    Throws a 404 error if the exercise ID is not found.
     """
+    # For now, we only have dummy data for exercise_id 1 (Squat)
+    if exercise_id != 1:
+        print(f"Error: Exercise {exercise_id} not found.")
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
     dummy_data = {
         "exercise_id": exercise_id,
         "name": "Squat",
