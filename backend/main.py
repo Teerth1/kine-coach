@@ -107,3 +107,15 @@ async def send_message(payload: ProviderMessage):
     db.save_message(payload.model_dump())
     
     return {"status": "success", "message": "Message received"}
+
+@app.get("/api/sessions/{patient_id}")
+async def fetch_patient_sessions(patient_id: int):
+    """
+    Returns an array of historical workout sessions for the dashboard chart.
+    """
+    sessions = db.get_patient_sessions(patient_id)
+    if not sessions:
+        # Return an empty list instead of a 404 so the UI can gracefully show "No Data"
+        return []
+        
+    return sessions

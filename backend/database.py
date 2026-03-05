@@ -84,3 +84,15 @@ def save_message(payload: dict) -> bool:
     
     print(f"DATABASE LAYER: Saved message for patient {payload.get('patient_id')} from provider {payload.get('provider_id')}")
     return _save_db(db)
+
+def get_patient_sessions(patient_id: int) -> list:
+    """
+    Fetches all historical session logs for a specific patient.
+    """
+    db_data = _load_db()
+    logs = db_data.get("session_logs", [])
+    
+    # Filter logs by patient ID
+    patient_logs = [log for log in logs if log.get("patient_id") == patient_id]
+    
+    return patient_logs
