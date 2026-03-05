@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any
 
-DB_PATH = os.path.join(os.path.dirname(__ current_file_path__), "mock_db.json")
+DB_PATH = os.path.join(os.path.dirname(__file__), "mock_db.json")
 
 def _load_db() -> Dict[str, Any]:
     """Helper to load the JSON database."""
