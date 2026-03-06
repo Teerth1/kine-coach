@@ -6,7 +6,9 @@ import { voiceFeedback } from './utils/voiceFeedback';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import confetti from 'canvas-confetti';
-import { playSuccessChime } from './utils/audio';
+import { playRepComplete, playMilestone, playWorkoutComplete, setMuted, getMuted } from './utils/sounds';
+import MilestoneToast from './components/ui/MilestoneToast';
+import { apiFetch } from './api/client';
 
 export default function App() {
   const { user, token, logout } = useAuth();
@@ -25,7 +27,10 @@ export default function App() {
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [clinicalReport, setClinicalReport] = useState(null);
   const [isFinishing, setIsFinishing] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const [repFeedback, setRepFeedback] = useState(null);
+  const [milestones, setMilestones] = useState({ 25: false, 50: false, 75: false, 100: false });
+  const [milestoneToast, setMilestoneToast] = useState(null);
+  const [soundMuted, setSoundMuted] = useState(false);
 
   // Daily Chores State
   const [assignments, setAssignments] = useState([]);
@@ -40,11 +45,7 @@ export default function App() {
   // Fetch assignments when patient logs in
   useEffect(() => {
     if (user?.role === 'patient' && sessionData.patient_id) {
-      fetch(`http://localhost:8000/api/assignments/${sessionData.patient_id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      apiFetch(`/api/assignments/${sessionData.patient_id}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -57,41 +58,64 @@ export default function App() {
 
   // Called dynamically when poseWorker.js math says the rep is officially over
   const handleRepCompleted = (result) => {
-    console.log("Rep completed:", result);
-
     // Speak out loud dynamically!
     voiceFeedback.coachRepCompleted(result.quality);
-    if (result.quality === 'PERFECT') {
-      playSuccessChime();
-    }
+
+    // Play rep complete chime on every rep
+    playRepComplete();
+
+    // Set rep feedback for color flash
+    setRepFeedback({ quality: result.quality, timestamp: Date.now() });
+    setTimeout(() => setRepFeedback(null), 1500);
 
     setSessionData(prev => {
       const newTotal = prev.total_reps_attempted + 1;
 
+      // Every 5th rep: small confetti pop
+      if (newTotal % 5 === 0) {
+        confetti({ particleCount: 30, spread: 60, origin: { y: 0.7 } });
+      }
+
       setAssignments(currentAssignments => {
+        // Find the first non-completed assignment for milestone tracking
+        const activeAssignment = currentAssignments.find(a => a.status !== 'completed');
+
+        if (activeAssignment) {
+          const target = activeAssignment.target_reps;
+          const pct = (newTotal / target) * 100;
+
+          // Check milestone thresholds
+          const thresholds = [
+            { pct: 25, msg: 'Great start! Keep going!' },
+            { pct: 50, msg: 'Halfway there!' },
+            { pct: 75, msg: 'Almost done! Strong finish!' },
+            { pct: 100, msg: 'All reps complete! Amazing work!' }
+          ];
+
+          setMilestones(prevMilestones => {
+            const updated = { ...prevMilestones };
+            for (const t of thresholds) {
+              if (pct >= t.pct && !prevMilestones[t.pct]) {
+                updated[t.pct] = true;
+                setMilestoneToast(t.msg);
+                playMilestone();
+
+                if (t.pct === 100) {
+                  confetti({ particleCount: 200, spread: 360, origin: { x: 0.5, y: 0.5 } });
+                  playWorkoutComplete();
+                }
+              }
+            }
+            return updated;
+          });
+        }
+
         return currentAssignments.map(a => {
           if (a.status !== 'completed') {
-            if (newTotal === Math.floor(a.target_reps / 2) && a.target_reps > 1) {
-              setToastMessage(`Halfway there! ${newTotal}/${a.target_reps} reps done!`);
-              setTimeout(() => setToastMessage(''), 3000);
-            }
-
             if (newTotal >= a.target_reps) {
-              // FIRE CONFETTI!
-              confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 }
-              });
-              setToastMessage("All reps complete! Great work! 🎉");
-              setTimeout(() => setToastMessage(''), 5000);
-
-              fetch(`http://localhost:8000/api/assignments/${a.id}/status`, {
+              // Mark assignment completed on backend
+              apiFetch(`/api/assignments/${a.id}/status`, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
                 body: JSON.stringify({ status: 'completed' })
               });
               return { ...a, status: 'completed' };
@@ -115,12 +139,8 @@ export default function App() {
   const finishSession = async () => {
     setIsFinishing(true);
     try {
-      const res = await fetch("http://localhost:8000/api/sessions", {
+      const res = await apiFetch("/api/sessions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
         body: JSON.stringify(sessionData)
       });
       const payload = await res.json();
@@ -169,15 +189,12 @@ export default function App() {
           className="dashboard-layout relative z-10"
         >
           <AnimatePresence>
-            {toastMessage && (
-              <motion.div
-                initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 20 }} exit={{ opacity: 0, y: -50 }}
-                className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none"
-              >
-                <div className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-full shadow-2xl border border-emerald-400">
-                  {toastMessage}
-                </div>
-              </motion.div>
+            {milestoneToast && (
+              <MilestoneToast
+                key={milestoneToast}
+                message={milestoneToast}
+                onDismiss={() => setMilestoneToast(null)}
+              />
             )}
           </AnimatePresence>
 
@@ -188,7 +205,16 @@ export default function App() {
               </button>
               <h1 className="bg-clip-text text-transparent bg-gradient-to-r from-brand-blue to-emerald-400">Kine-Coach</h1>
             </div>
-            <div className="patient-badge">Patient ID: {sessionData.patient_id}</div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => { const next = !soundMuted; setSoundMuted(next); setMuted(next); }}
+                className="text-text-secondary hover:text-white text-sm font-bold bg-black/40 px-3 py-2 rounded-lg border border-border-glass transition-colors"
+                title={soundMuted ? 'Unmute sounds' : 'Mute sounds'}
+              >
+                {soundMuted ? 'Sound OFF' : 'Sound ON'}
+              </button>
+              <div className="patient-badge">Patient ID: {sessionData.patient_id}</div>
+            </div>
           </header>
 
           <div className="h-8"></div>
@@ -217,10 +243,25 @@ export default function App() {
                 )}
 
                 <h2>Live Tracker</h2>
-                <div className="stat-card">
+                <motion.div
+                  className="stat-card relative overflow-hidden"
+                  animate={
+                    repFeedback
+                      ? repFeedback.quality === 'PERFECT'
+                        ? { scale: [1, 1.15, 1] }
+                        : { x: [-5, 5, -5, 0] }
+                      : { scale: 1, x: 0 }
+                  }
+                  transition={{ duration: repFeedback ? (repFeedback.quality === 'PERFECT' ? 0.3 : 0.2) : 0.2 }}
+                  style={{
+                    backgroundColor: repFeedback
+                      ? repFeedback.quality === 'PERFECT' ? '#22c55e' : '#ef4444'
+                      : undefined
+                  }}
+                >
                   <p className="stat-label">Total Reps</p>
                   <p className="stat-value text-brand-blue">{sessionData.total_reps_attempted}</p>
-                </div>
+                </motion.div>
 
                 <div className="stat-row">
                   <div className="stat-card relative overflow-hidden group">

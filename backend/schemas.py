@@ -5,6 +5,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: str = Field(..., description="'patient' or 'provider'")
+    full_name: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -27,6 +28,8 @@ class ExerciseTarget(BaseModel):
     target_muscles: List[str] = Field(..., description="Target muscles")
     angle_requirements: Dict[str, Any] = Field(..., description="Target angle parameters for the CV model")
     default_rep_target: int = Field(..., description="Default reps to perform")
+    category: Optional[str] = Field(None, description="Exercise category (e.g., 'lower_body', 'upper_body')")
+    difficulty: Optional[str] = Field(None, description="Difficulty level (e.g., 'beginner', 'intermediate', 'advanced')")
 
 class SessionPayload(BaseModel):
     patient_id: int = Field(..., description="ID of the patient")

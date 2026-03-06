@@ -1,14 +1,38 @@
+import os
+import asyncio
+import logging
+from typing import List
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordRequestForm
+from google import genai
+from datetime import datetime
+from fpdf import FPDF
 from auth import create_access_token, get_current_user, verify_password, get_password_hash
 from schemas import ExerciseTarget, SessionPayload, ProviderMessage, AssignmentCreate, AssignmentStatusUpdate, UserCreate, Token
 import database as db
-from fpdf import FPDF
-from typing import List
+
+# Load environment variables from .env
+load_dotenv()
+
+logger = logging.getLogger("kine-coach")
 
 app = FastAPI(title="Kine-Coach API")
+
+@app.on_event("startup")
+async def seed_demo_users():
+    """Seed demo users on startup if they don't already exist."""
+    demo_users = [
+        {"email": "patient@kine.coach", "password": "demo1234", "role": "patient", "id": 101},
+        {"email": "provider@kine.coach", "password": "demo1234", "role": "provider", "id": 201},
+    ]
+    for demo in demo_users:
+        existing = db.get_user_by_email(demo["email"])
+        if not existing:
+            hashed = get_password_hash(demo["password"])
+            db.create_user({"email": demo["email"], "password": hashed, "role": demo["role"]})
 
 # Configure CORS to allow all origins as requested
 app.add_middleware(
@@ -39,11 +63,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/exercises", response_model=List[ExerciseTarget])
-async def get_all_exercises():
+async def get_all_exercises(category: str = None):
     """
     Returns the list of all supported dynamic exercises configuration and angles.
+    Optionally filter by category (e.g., ?category=lower_body).
     """
-    return db.get_exercises()
+    exercises = db.get_exercises()
+    if category:
+        exercises = [e for e in exercises if e.get("category") == category]
+    return exercises
 
 @app.get("/api/exercises/{exercise_id}", response_model=ExerciseTarget)
 async def get_exercise_target(exercise_id: int):
@@ -53,30 +81,24 @@ async def get_exercise_target(exercise_id: int):
     exercise = db.get_exercise(exercise_id)
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
-        
-    print(f"Returning dynamic threshold data for exercise_id: {exercise_id}")
     return exercise
-
-from google import genai
-import os
-from dotenv import load_dotenv
-from fastapi import HTTPException
-from tenacity import retry, stop_after_attempt, wait_exponential
-
-# Load environment variables from .env
-load_dotenv()
 
 # Initialize Gemini Client
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=60))
-async def generate_gemini_report(payload: SessionPayload) -> str:
+# Gemini model configuration with fallback chain
+GEMINI_MODEL_PRIMARY = os.environ.get("GEMINI_MODEL_PRIMARY", "gemini-2.5-flash")
+GEMINI_MODEL_FALLBACK = os.environ.get("GEMINI_MODEL_FALLBACK", "gemini-2.0-flash")
+
+async def generate_gemini_report(payload: SessionPayload) -> dict:
     """
-    Uses the Gemini API to generate a clinical 'future improvements' report.
+    Uses the Gemini API with retry + model fallback chain.
+    Returns dict with either {"status": "success", "report": "..."}
+    or {"status": "report_pending", "message": "..."}
     """
-    if not os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") == "INSERT_YOUR_GEMINI_API_KEY_HERE":
-         return "Warning: GEMINI_API_KEY not set. This is a fallback mock report."
-         
+    if not os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") == "your_gemini_api_key_here":
+        return {"status": "success", "report": "Warning: GEMINI_API_KEY not set. This is a fallback mock report."}
+
     prompt = (
         f"You are a clinical AI assistant for a physical therapy app called Kine-Coach.\n"
         f"A patient just finished their session. Please write a short (2-3 sentences max) "
@@ -90,17 +112,36 @@ async def generate_gemini_report(payload: SessionPayload) -> str:
         f"- Patient Quiz Feedback: '{payload.quiz_answers}'\n\n"
         f"Keep the tone professional, objective, and actionable for a physical therapist."
     )
-    
-    try:
-        # Use gemini-2.0-flash as it's faster, cheaper and less likely to hit capacity issues
-        response = await client.aio.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt,
-        )
-        return response.text
-    except Exception as e:
-        print(f"Gemini API Error: {e}")
-        raise
+
+    models = [GEMINI_MODEL_PRIMARY, GEMINI_MODEL_FALLBACK]
+
+    for model_name in models:
+        delay = 5
+        for attempt in range(3):
+            try:
+                logger.info(f"Gemini attempt {attempt+1}/3 with model {model_name}")
+                response = await asyncio.wait_for(
+                    client.aio.models.generate_content(model=model_name, contents=prompt),
+                    timeout=30.0
+                )
+                return {"status": "success", "report": response.text}
+            except asyncio.TimeoutError:
+                logger.warning(f"Gemini timeout on attempt {attempt+1} with model {model_name}")
+            except Exception as e:
+                error_str = str(e)
+                logger.warning(f"Gemini error on attempt {attempt+1} with model {model_name}: {error_str}")
+                if "503" in error_str or "CAPACITY" in error_str.upper():
+                    if attempt < 2:
+                        await asyncio.sleep(min(delay, 60))
+                        delay *= 2
+                    continue
+                # Non-capacity error, try next model
+                break
+
+    return {
+        "status": "report_pending",
+        "message": "AI report generation is temporarily unavailable. Your session data has been saved and the report will be generated automatically when capacity is available."
+    }
 
 @app.post("/api/sessions")
 async def process_session(payload: SessionPayload, current_user: dict = Depends(get_current_user)):
@@ -109,16 +150,19 @@ async def process_session(payload: SessionPayload, current_user: dict = Depends(
     """
     if current_user["role"] != "patient" or current_user["id"] != payload.patient_id:
         raise HTTPException(status_code=403, detail="Not authorized to post telemetry for this patient")
-    # Print the received payload to the console
-    print(f"Received SessionPayload: {payload.model_dump()}")
-    
+
+    if payload.exercise_id is not None:
+        exercise = db.get_exercise(payload.exercise_id)
+        if not exercise:
+            raise HTTPException(status_code=400, detail=f"Exercise with id {payload.exercise_id} does not exist")
+
     # Hand off to Database Engineer's layer
     db.save_session(payload.model_dump())
-    
+
     # Generate the actual Gemini report
-    report = await generate_gemini_report(payload)
-    
-    return {"status": "success", "report": report}
+    report_result = await generate_gemini_report(payload)
+
+    return {"status": "success", **report_result}
 
 @app.post("/api/messages")
 async def send_message(payload: ProviderMessage, current_user: dict = Depends(get_current_user)):
@@ -127,9 +171,6 @@ async def send_message(payload: ProviderMessage, current_user: dict = Depends(ge
     """
     if current_user["role"] != "provider":
         raise HTTPException(status_code=403, detail="Only providers can send messages")
-    # Print the received payload to the console
-    print(f"Received ProviderMessage: {payload.model_dump()}")
-    
     # Hand off to Database Engineer's layer
     db.save_message(payload.model_dump())
     
@@ -150,7 +191,7 @@ async def fetch_patient_sessions(patient_id: int, current_user: dict = Depends(g
     return sessions
 
 @app.get("/api/sessions/{patient_id}/pdf")
-async def generate_pdf_summary(patient_id: int):
+async def generate_pdf_summary(patient_id: int, current_user: dict = Depends(get_current_user)):
     """
     Generates a printable PDF medical summary for insurance providers.
     """
@@ -187,7 +228,6 @@ async def generate_pdf_summary(patient_id: int):
         
     pdf.ln(20)
     pdf.set_font("Arial", 'I', 10)
-    from datetime import datetime
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     pdf.cell(200, 10, txt=f"Report Generated: {current_time}", ln=True)
     pdf.ln(10)
@@ -221,7 +261,7 @@ async def fetch_patient_assignments(patient_id: int, current_user: dict = Depend
     return assignments
 
 @app.post("/api/assignments/{assignment_id}/status")
-async def update_assignment_status(assignment_id: int, payload: AssignmentStatusUpdate):
+async def update_assignment_status(assignment_id: int, payload: AssignmentStatusUpdate, current_user: dict = Depends(get_current_user)):
     """
     Updates the completion status of a specific assignment.
     """
@@ -229,3 +269,7 @@ async def update_assignment_status(assignment_id: int, payload: AssignmentStatus
     if not success:
         raise HTTPException(status_code=404, detail="Assignment not found")
     return {"status": "success"}
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "version": "1.0.0"}

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api/client';
 
 export default function ProviderDashboard() {
-    const { token } = useAuth();
+    useAuth(); // Ensures user is authenticated
     const [patientId, setPatientId] = useState(101); // Default patient
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -19,9 +20,7 @@ export default function ProviderDashboard() {
     const fetchHistory = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:8000/api/sessions/${patientId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch(`/api/sessions/${patientId}`);
             if (res.ok) {
                 const data = await res.json();
                 // Format dates cleanly for Recharts
@@ -48,12 +47,8 @@ export default function ProviderDashboard() {
         if (!providerMessage.trim()) return;
         try {
             const payload = { provider_id: 1, patient_id: patientId, message_body: providerMessage.trim() };
-            const res = await fetch("http://localhost:8000/api/messages", {
+            const res = await apiFetch("/api/messages", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
@@ -67,7 +62,19 @@ export default function ProviderDashboard() {
     };
 
     const downloadPDF = async () => {
-        window.open(`http://localhost:8000/api/sessions/${patientId}/pdf`, '_blank');
+        try {
+            const res = await apiFetch(`/api/sessions/${patientId}/pdf`);
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patient_${patientId}_summary.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("PDF download failed:", err);
+        }
     };
 
     // Calculate aggregates

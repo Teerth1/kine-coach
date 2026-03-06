@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "mock_db.json")
 
@@ -169,25 +169,12 @@ def update_assignment_status(assignment_id: int, status: str) -> bool:
             return True
     return False
 
-def get_user_by_email(email: str) -> dict:
+def get_user_by_email(email: str) -> Optional[dict]:
     db = _load_db()
     
-    # Pre-seed if missing
-    if "users" not in db or not db["users"]:
-        db["users"] = [
-            {
-                "id": 101,
-                "email": "patient@example.com",
-                "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQG8.R7O", # password
-                "role": "patient"
-            },
-            {
-                "id": 201,
-                "email": "provider@example.com",
-                "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQG8.R7O", # password
-                "role": "provider"
-            }
-        ]
+    # Ensure users list exists (seeding is handled by the startup event in main.py)
+    if "users" not in db:
+        db["users"] = []
         _save_db(db)
         
     for user in db.get("users", []):
@@ -220,49 +207,66 @@ def get_exercises() -> list:
             {
                 "id": 1,
                 "name": "Squat",
-                "description": "Lower body exercise focusing on quads, glutes, and core.",
-                "target_muscles": ["Quadriceps", "Glutes", "Hamstrings"],
+                "description": "Lower body compound exercise focusing on quads, glutes, and core stability.",
+                "target_muscles": ["Quadriceps", "Glutes", "Hamstrings", "Core"],
+                "category": "lower_body",
+                "difficulty": "beginner",
                 "angle_requirements": {
                     "KNEE_STANDING": 160,
                     "HIP_STANDING": 160,
                     "KNEE_SQUAT_PERFECT": 90,
-                    "KNEE_SQUAT_START": 130
+                    "KNEE_SQUAT_START": 130,
+                    "ideal_range": [70, 100],
+                    "acceptable_range": [55, 110]
                 },
                 "default_rep_target": 10
             },
             {
                 "id": 2,
                 "name": "Lunge",
-                "description": "Unilateral leg exercise for balance and strength.",
-                "target_muscles": ["Quadriceps", "Glutes", "Calves"],
+                "description": "Unilateral leg exercise for balance, coordination, and lower body strength.",
+                "target_muscles": ["Quadriceps", "Glutes", "Calves", "Hamstrings"],
+                "category": "lower_body",
+                "difficulty": "intermediate",
                 "angle_requirements": {
                     "KNEE_STANDING": 160,
                     "KNEE_LUNGE_PERFECT": 90,
-                    "KNEE_LUNGE_START": 140
+                    "KNEE_LUNGE_START": 140,
+                    "VALGUS_WARNING_RATIO": 0.15,
+                    "ideal_range": [80, 100],
+                    "acceptable_range": [65, 115]
                 },
-                "default_rep_target": 12
+                "default_rep_target": 8
             },
             {
                 "id": 3,
                 "name": "Pushup",
-                "description": "Upper body pressing exercise for chest and triceps.",
-                "target_muscles": ["Chest", "Triceps", "Shoulders"],
+                "description": "Upper body pressing exercise targeting chest, triceps, and anterior deltoids.",
+                "target_muscles": ["Chest", "Triceps", "Shoulders", "Core"],
+                "category": "upper_body",
+                "difficulty": "beginner",
                 "angle_requirements": {
                     "ELBOW_EXTENDED": 160,
                     "ELBOW_FLEXED_PERFECT": 90,
-                    "ELBOW_START": 140
+                    "ELBOW_START": 140,
+                    "ideal_range": [80, 100],
+                    "acceptable_range": [65, 115]
                 },
-                "default_rep_target": 15
+                "default_rep_target": 10
             },
             {
                 "id": 4,
                 "name": "Overhead Press",
-                "description": "Shoulder press pushing weight vertically over head.",
-                "target_muscles": ["Shoulders", "Triceps"],
+                "description": "Shoulder press pushing weight vertically overhead for deltoid and tricep development.",
+                "target_muscles": ["Shoulders", "Triceps", "Upper Chest"],
+                "category": "upper_body",
+                "difficulty": "intermediate",
                 "angle_requirements": {
                     "ELBOW_RESTING": 90,
                     "ELBOW_EXTENDED_PERFECT": 160,
-                    "ELBOW_START": 110
+                    "ELBOW_START": 110,
+                    "ideal_range": [155, 175],
+                    "acceptable_range": [140, 180]
                 },
                 "default_rep_target": 10
             }
@@ -270,7 +274,7 @@ def get_exercises() -> list:
         _save_db(db)
     return db["exercises"]
 
-def get_exercise(exercise_id: int) -> dict | None:
+def get_exercise(exercise_id: int) -> Optional[dict]:
     for ex in get_exercises():
         if ex["id"] == exercise_id:
             return ex
