@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProviderDashboard() {
+    const { token } = useAuth();
     const [patientId, setPatientId] = useState(101); // Default patient
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -17,7 +19,9 @@ export default function ProviderDashboard() {
     const fetchHistory = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:8000/api/sessions/${patientId}`);
+            const res = await fetch(`http://localhost:8000/api/sessions/${patientId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (res.ok) {
                 const data = await res.json();
                 // Format dates cleanly for Recharts
@@ -43,10 +47,13 @@ export default function ProviderDashboard() {
     const sendMessage = async () => {
         if (!providerMessage.trim()) return;
         try {
-            const payload = { provider_id: 1, patient_id: patientId, message: providerMessage.trim() };
+            const payload = { provider_id: 1, patient_id: patientId, message_body: providerMessage.trim() };
             const res = await fetch("http://localhost:8000/api/messages", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify(payload)
             });
             if (res.ok) {

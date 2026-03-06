@@ -13,11 +13,7 @@ export const OHP_STATES = {
     DESCENDING: 'DESCENDING'
 };
 
-const THRESHOLDS = {
-    ELBOW_RACK_MAX: 80,     // Elbow angle ≤ 80° means they are in the "rack" position
-    ELBOW_LOCKOUT: 160,     // Elbow angle ≥ 160° means fully extended overhead
-    ELBOW_PRESS_START: 100  // Started pressing upward
-};
+
 
 export class OverheadPressStateMachine {
     constructor() {
@@ -27,6 +23,11 @@ export class OverheadPressStateMachine {
             total: 0,
             perfect: 0,   // Full lockout ≥ 160°
             partial: 0    // Did not achieve full lockout
+        };
+        this.THRESHOLDS = {
+            ELBOW_RACK_MAX: 80,
+            ELBOW_LOCKOUT: 160,
+            ELBOW_PRESS_START: 100
         };
     }
 
@@ -42,14 +43,14 @@ export class OverheadPressStateMachine {
         switch (this.currentState) {
             case OHP_STATES.RACK:
                 // They start pressing when elbow goes past the rack threshold
-                if (elbowAngle > THRESHOLDS.ELBOW_PRESS_START) {
+                if (elbowAngle > this.THRESHOLDS.ELBOW_PRESS_START) {
                     this.currentState = OHP_STATES.PRESSING;
                     this.highestElbowAngle = elbowAngle;
                 }
                 break;
 
             case OHP_STATES.PRESSING:
-                if (elbowAngle >= THRESHOLDS.ELBOW_LOCKOUT) {
+                if (elbowAngle >= this.THRESHOLDS.ELBOW_LOCKOUT) {
                     this.currentState = OHP_STATES.LOCKOUT;
                 }
                 // They gave up before lockout - start descending
@@ -60,14 +61,14 @@ export class OverheadPressStateMachine {
 
             case OHP_STATES.LOCKOUT:
                 // Any angle drop means they are coming back down
-                if (elbowAngle < THRESHOLDS.ELBOW_LOCKOUT - 10) {
+                if (elbowAngle < this.THRESHOLDS.ELBOW_LOCKOUT - 10) {
                     this.currentState = OHP_STATES.DESCENDING;
                 }
                 break;
 
             case OHP_STATES.DESCENDING:
                 // Rep complete when elbows return to rack position
-                if (elbowAngle <= THRESHOLDS.ELBOW_RACK_MAX) {
+                if (elbowAngle <= this.THRESHOLDS.ELBOW_RACK_MAX) {
                     return this._gradeAndResetRep();
                 }
                 break;
@@ -84,7 +85,7 @@ export class OverheadPressStateMachine {
         this.repCount.total++;
         let quality;
 
-        if (this.highestElbowAngle >= THRESHOLDS.ELBOW_LOCKOUT) {
+        if (this.highestElbowAngle >= this.THRESHOLDS.ELBOW_LOCKOUT) {
             quality = 'PERFECT';
             this.repCount.perfect++;
         } else {

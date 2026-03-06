@@ -10,12 +10,7 @@ export const LUNGE_STATES = {
     ASCENDING: 'ASCENDING'
 };
 
-const THRESHOLDS = {
-    KNEE_STANDING: 160,
-    KNEE_LUNGE_PERFECT: 90,
-    KNEE_LUNGE_START: 130,
-    VALGUS_WARNING_RATIO: 0.15 // If X-diff exceeds 15% of body width
-};
+
 
 export class LungeStateMachine {
     constructor() {
@@ -28,6 +23,12 @@ export class LungeStateMachine {
             perfect: 0,
             shallow: 0,
             valgusViolations: 0
+        };
+        this.THRESHOLDS = {
+            KNEE_STANDING: 160,
+            KNEE_LUNGE_PERFECT: 90,
+            KNEE_LUNGE_START: 130,
+            VALGUS_WARNING_RATIO: 0.15
         };
     }
 
@@ -48,7 +49,7 @@ export class LungeStateMachine {
         if (this.currentState === LUNGE_STATES.DESCENDING || this.currentState === LUNGE_STATES.BOTTOM) {
             const ankleToHipX = Math.abs(hip.x - ankle.x);
             const kneeOffset = Math.abs(knee.x - ((hip.x + ankle.x) / 2));
-            if (kneeOffset > THRESHOLDS.VALGUS_WARNING_RATIO) {
+            if (kneeOffset > this.THRESHOLDS.VALGUS_WARNING_RATIO) {
                 isBuckling = true;
                 this.valgusWarnings++;
             }
@@ -56,7 +57,7 @@ export class LungeStateMachine {
 
         switch (this.currentState) {
             case LUNGE_STATES.STANDING:
-                if (kneeAngle < THRESHOLDS.KNEE_LUNGE_START) {
+                if (kneeAngle < this.THRESHOLDS.KNEE_LUNGE_START) {
                     this.currentState = LUNGE_STATES.DESCENDING;
                     this.lowestKneeAngle = kneeAngle;
                     this.valgusWarnings = 0;
@@ -64,7 +65,7 @@ export class LungeStateMachine {
                 break;
 
             case LUNGE_STATES.DESCENDING:
-                if (kneeAngle <= THRESHOLDS.KNEE_LUNGE_PERFECT) {
+                if (kneeAngle <= this.THRESHOLDS.KNEE_LUNGE_PERFECT) {
                     this.currentState = LUNGE_STATES.BOTTOM;
                 }
                 else if (kneeAngle > this.lowestKneeAngle + 10) {
@@ -73,13 +74,13 @@ export class LungeStateMachine {
                 break;
 
             case LUNGE_STATES.BOTTOM:
-                if (kneeAngle > THRESHOLDS.KNEE_LUNGE_PERFECT + 15) {
+                if (kneeAngle > this.THRESHOLDS.KNEE_LUNGE_PERFECT + 15) {
                     this.currentState = LUNGE_STATES.ASCENDING;
                 }
                 break;
 
             case LUNGE_STATES.ASCENDING:
-                if (kneeAngle >= THRESHOLDS.KNEE_STANDING) {
+                if (kneeAngle >= this.THRESHOLDS.KNEE_STANDING) {
                     return this._gradeAndResetRep();
                 }
                 break;
@@ -97,7 +98,7 @@ export class LungeStateMachine {
         this.repCount.total++;
         let quality = 'SHALLOW';
 
-        if (this.lowestKneeAngle <= THRESHOLDS.KNEE_LUNGE_PERFECT) {
+        if (this.lowestKneeAngle <= this.THRESHOLDS.KNEE_LUNGE_PERFECT) {
             quality = 'PERFECT';
             this.repCount.perfect++;
         } else {

@@ -1,13 +1,36 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Dict, Any, Optional
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    role: str = Field(..., description="'patient' or 'provider'")
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    role: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
+    role: Optional[str] = None
+    id: Optional[int] = None
 
 class ExerciseTarget(BaseModel):
-    exercise_id: int = Field(..., description="Unique identifier for the exercise")
+    id: int = Field(..., description="Unique identifier for the exercise")
     name: str = Field(..., description="Name of the exercise")
-    target_angles: Dict[str, Any] = Field(..., description="Target angles, e.g., {'knee': '< 90', 'hip': '< 100'}")
+    description: str = Field(..., description="Description of the exercise")
+    target_muscles: List[str] = Field(..., description="Target muscles")
+    angle_requirements: Dict[str, Any] = Field(..., description="Target angle parameters for the CV model")
+    default_rep_target: int = Field(..., description="Default reps to perform")
 
 class SessionPayload(BaseModel):
     patient_id: int = Field(..., description="ID of the patient")
+    exercise_id: Optional[int] = Field(None, description="ID of the exercise performed")
     total_reps_attempted: int = Field(..., description="Total reps attempted during the session")
     perfect_reps: int = Field(..., description="Number of perfect reps")
     shallow_reps: int = Field(..., description="Number of shallow reps")

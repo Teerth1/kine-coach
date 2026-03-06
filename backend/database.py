@@ -9,13 +9,13 @@ def _load_db() -> Dict[str, Any]:
     """Helper to load the JSON database."""
     try:
         if not os.path.exists(DB_PATH):
-            return {"patients": [], "prescribed_exercises": [], "session_logs": [], "messages": []}
+            return {"users": [], "patients": [], "prescribed_exercises": [], "session_logs": [], "messages": []}
             
         with open(DB_PATH, "r") as f:
             return json.load(f)
     except json.JSONDecodeError:
         print("Warning: Failed to decode mock database. Returning empty schema.")
-        return {"patients": [], "prescribed_exercises": [], "session_logs": [], "messages": []}
+        return {"users": [], "patients": [], "prescribed_exercises": [], "session_logs": [], "messages": []}
 
 def _save_db(data: Dict[str, Any]) -> bool:
     """Helper to save the JSON database safely."""
@@ -168,3 +168,110 @@ def update_assignment_status(assignment_id: int, status: str) -> bool:
             print(f"DATABASE LAYER: Updated assignment {assignment_id} status to {status}")
             return True
     return False
+
+def get_user_by_email(email: str) -> dict:
+    db = _load_db()
+    
+    # Pre-seed if missing
+    if "users" not in db or not db["users"]:
+        db["users"] = [
+            {
+                "id": 101,
+                "email": "patient@example.com",
+                "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQG8.R7O", # password
+                "role": "patient"
+            },
+            {
+                "id": 201,
+                "email": "provider@example.com",
+                "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQG8.R7O", # password
+                "role": "provider"
+            }
+        ]
+        _save_db(db)
+        
+    for user in db.get("users", []):
+        if user.get("email") == email:
+            return user
+    return None
+
+def create_user(user_data: dict) -> dict:
+    db = _load_db()
+    if "users" not in db:
+        db["users"] = []
+    
+    new_id = max([u.get("id", 0) for u in db["users"]], default=300) + 1
+    
+    new_user = {
+        "id": new_id,
+        "email": user_data["email"],
+        "hashed_password": user_data["password"],
+        "role": user_data["role"]
+    }
+    
+    db["users"].append(new_user)
+    _save_db(db)
+    return {"id": new_user["id"], "email": new_user["email"], "role": new_user["role"]}
+
+def get_exercises() -> list:
+    db = _load_db()
+    if "exercises" not in db or not db["exercises"]:
+        db["exercises"] = [
+            {
+                "id": 1,
+                "name": "Squat",
+                "description": "Lower body exercise focusing on quads, glutes, and core.",
+                "target_muscles": ["Quadriceps", "Glutes", "Hamstrings"],
+                "angle_requirements": {
+                    "KNEE_STANDING": 160,
+                    "HIP_STANDING": 160,
+                    "KNEE_SQUAT_PERFECT": 90,
+                    "KNEE_SQUAT_START": 130
+                },
+                "default_rep_target": 10
+            },
+            {
+                "id": 2,
+                "name": "Lunge",
+                "description": "Unilateral leg exercise for balance and strength.",
+                "target_muscles": ["Quadriceps", "Glutes", "Calves"],
+                "angle_requirements": {
+                    "KNEE_STANDING": 160,
+                    "KNEE_LUNGE_PERFECT": 90,
+                    "KNEE_LUNGE_START": 140
+                },
+                "default_rep_target": 12
+            },
+            {
+                "id": 3,
+                "name": "Pushup",
+                "description": "Upper body pressing exercise for chest and triceps.",
+                "target_muscles": ["Chest", "Triceps", "Shoulders"],
+                "angle_requirements": {
+                    "ELBOW_EXTENDED": 160,
+                    "ELBOW_FLEXED_PERFECT": 90,
+                    "ELBOW_START": 140
+                },
+                "default_rep_target": 15
+            },
+            {
+                "id": 4,
+                "name": "Overhead Press",
+                "description": "Shoulder press pushing weight vertically over head.",
+                "target_muscles": ["Shoulders", "Triceps"],
+                "angle_requirements": {
+                    "ELBOW_RESTING": 90,
+                    "ELBOW_EXTENDED_PERFECT": 160,
+                    "ELBOW_START": 110
+                },
+                "default_rep_target": 10
+            }
+        ]
+        _save_db(db)
+    return db["exercises"]
+
+def get_exercise(exercise_id: int) -> dict | None:
+    for ex in get_exercises():
+        if ex["id"] == exercise_id:
+            return ex
+    return None

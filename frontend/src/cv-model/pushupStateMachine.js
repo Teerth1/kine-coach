@@ -10,12 +10,7 @@ export const PUSHUP_STATES = {
     ASCENDING: 'ASCENDING'
 };
 
-const THRESHOLDS = {
-    ELBOW_PLANK: 160,     // Arms almost straight
-    SHOULDER_PLANK: 60,   // Shoulder relative to hip
-    ELBOW_PUSHUP_PERFECT: 90, // Elbow bent deep enough
-    ELBOW_PUSHUP_START: 140   // Started bending
-};
+
 
 export class PushupStateMachine {
     constructor() {
@@ -27,6 +22,12 @@ export class PushupStateMachine {
             total: 0,
             perfect: 0,
             shallow: 0
+        };
+        this.THRESHOLDS = {
+            ELBOW_PLANK: 160,
+            SHOULDER_PLANK: 60,
+            ELBOW_PUSHUP_PERFECT: 90,
+            ELBOW_PUSHUP_START: 140
         };
     }
 
@@ -43,7 +44,7 @@ export class PushupStateMachine {
 
         switch (this.currentState) {
             case PUSHUP_STATES.PLANK:
-                if (elbowAngle < THRESHOLDS.ELBOW_PUSHUP_START) {
+                if (elbowAngle < this.THRESHOLDS.ELBOW_PUSHUP_START) {
                     this.currentState = PUSHUP_STATES.DESCENDING;
                     this.lowestElbowAngle = elbowAngle; // Reset on new rep start
                 }
@@ -51,7 +52,7 @@ export class PushupStateMachine {
 
             case PUSHUP_STATES.DESCENDING:
                 // If they go deep enough, they officially hit the "BOTTOM" state
-                if (elbowAngle <= THRESHOLDS.ELBOW_PUSHUP_PERFECT) {
+                if (elbowAngle <= this.THRESHOLDS.ELBOW_PUSHUP_PERFECT) {
                     this.currentState = PUSHUP_STATES.BOTTOM;
                 }
                 // If they don't go deep but start coming back up (ascending prematurely)
@@ -62,14 +63,14 @@ export class PushupStateMachine {
 
             case PUSHUP_STATES.BOTTOM:
                 // Coming back up from the deep pushup
-                if (elbowAngle > THRESHOLDS.ELBOW_PUSHUP_PERFECT + 15) {
+                if (elbowAngle > this.THRESHOLDS.ELBOW_PUSHUP_PERFECT + 15) {
                     this.currentState = PUSHUP_STATES.ASCENDING;
                 }
                 break;
 
             case PUSHUP_STATES.ASCENDING:
                 // Pushed all the way back up to plank
-                if (elbowAngle >= THRESHOLDS.ELBOW_PLANK) {
+                if (elbowAngle >= this.THRESHOLDS.ELBOW_PLANK) {
                     // Rep is officially finished.
                     return this._gradeAndResetRep();
                 }
@@ -88,7 +89,7 @@ export class PushupStateMachine {
         let quality = 'SHALLOW';
 
         // 90 degrees or less elbow bend is a perfect pushup
-        if (this.lowestElbowAngle <= THRESHOLDS.ELBOW_PUSHUP_PERFECT) {
+        if (this.lowestElbowAngle <= this.THRESHOLDS.ELBOW_PUSHUP_PERFECT) {
             quality = 'PERFECT';
             this.repCount.perfect++;
         } else {

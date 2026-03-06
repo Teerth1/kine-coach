@@ -1,9 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from schemas import ExerciseTarget, SessionPayload, ProviderMessage, AssignmentCreate, AssignmentStatusUpdate
+from fastapi.security import OAuth2PasswordRequestForm
+from auth import create_access_token, get_current_user, verify_password, get_password_hash
+from schemas import ExerciseTarget, SessionPayload, ProviderMessage, AssignmentCreate, AssignmentStatusUpdate, UserCreate, Token
 import database as db
 from fpdf import FPDF
+from typing import List
 
 app = FastAPI(title="Kine-Coach API")
 
@@ -16,32 +19,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.post("/api/auth/register", response_model=dict)
+async def register(user: UserCreate):
+    existing = db.get_user_by_email(user.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed = get_password_hash(user.password)
+    new_user = db.create_user({"email": user.email, "password": hashed, "role": user.role})
+    return {"status": "success", "user": new_user}
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = db.get_user_by_email(form_data.username)
+    if not user or not verify_password(form_data.password, user["hashed_password"]):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    
+    access_token = create_access_token(data={"sub": user["email"], "role": user["role"], "id": user["id"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/exercises", response_model=List[ExerciseTarget])
+async def get_all_exercises():
+    """
+    Returns the list of all supported dynamic exercises configuration and angles.
+    """
+    return db.get_exercises()
+
 @app.get("/api/exercises/{exercise_id}", response_model=ExerciseTarget)
 async def get_exercise_target(exercise_id: int):
     """
-    Returns dummy target angle data to inject into the frontend AI.
-    Throws a 404 error if the exercise ID is not found.
+    Returns target angle requirements for the CV.
     """
-    # For now, we only have dummy data for exercise_id 1 (Squat)
-    if exercise_id != 1:
-        print(f"Error: Exercise {exercise_id} not found.")
+    exercise = db.get_exercise(exercise_id)
+    if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
         
-    dummy_data = {
-        "exercise_id": exercise_id,
-        "name": "Squat",
-        "target_angles": {
-            "knee": "< 90",
-            "hip": "< 100"
-        }
-    }
-    print(f"Returning dummy data for exercise_id: {exercise_id}")
-    return dummy_data
+    print(f"Returning dynamic threshold data for exercise_id: {exercise_id}")
+    return exercise
 
 from google import genai
 import os
 from dotenv import load_dotenv
 from fastapi import HTTPException
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Load environment variables from .env
 load_dotenv()
@@ -49,6 +69,7 @@ load_dotenv()
 # Initialize Gemini Client
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=60))
 async def generate_gemini_report(payload: SessionPayload) -> str:
     """
     Uses the Gemini API to generate a clinical 'future improvements' report.
@@ -71,21 +92,23 @@ async def generate_gemini_report(payload: SessionPayload) -> str:
     )
     
     try:
-        # Use gemini-2.5-flash as requested, fully async!
+        # Use gemini-2.0-flash as it's faster, cheaper and less likely to hit capacity issues
         response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=prompt,
         )
         return response.text
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate AI report.")
+        raise
 
 @app.post("/api/sessions")
-async def process_session(payload: SessionPayload):
+async def process_session(payload: SessionPayload, current_user: dict = Depends(get_current_user)):
     """
     Receives the SessionPayload, prints it, and returns the Gemini AI summary.
     """
+    if current_user["role"] != "patient" or current_user["id"] != payload.patient_id:
+        raise HTTPException(status_code=403, detail="Not authorized to post telemetry for this patient")
     # Print the received payload to the console
     print(f"Received SessionPayload: {payload.model_dump()}")
     
@@ -98,10 +121,12 @@ async def process_session(payload: SessionPayload):
     return {"status": "success", "report": report}
 
 @app.post("/api/messages")
-async def send_message(payload: ProviderMessage):
+async def send_message(payload: ProviderMessage, current_user: dict = Depends(get_current_user)):
     """
     Receives the ProviderMessage payload, prints it, and returns a success status.
     """
+    if current_user["role"] != "provider":
+        raise HTTPException(status_code=403, detail="Only providers can send messages")
     # Print the received payload to the console
     print(f"Received ProviderMessage: {payload.model_dump()}")
     
@@ -111,10 +136,12 @@ async def send_message(payload: ProviderMessage):
     return {"status": "success", "message": "Message received"}
 
 @app.get("/api/sessions/{patient_id}")
-async def fetch_patient_sessions(patient_id: int):
+async def fetch_patient_sessions(patient_id: int, current_user: dict = Depends(get_current_user)):
     """
     Returns an array of historical workout sessions for the dashboard chart.
     """
+    if current_user["role"] == "patient" and current_user["id"] != patient_id:
+        raise HTTPException(status_code=403, detail="Cannot view other patients' data")
     sessions = db.get_patient_sessions(patient_id)
     if not sessions:
         # Return an empty list instead of a 404 so the UI can gracefully show "No Data"
@@ -174,18 +201,22 @@ async def generate_pdf_summary(patient_id: int):
 
 
 @app.post("/api/assignments")
-async def create_assignment(payload: AssignmentCreate):
+async def create_assignment(payload: AssignmentCreate, current_user: dict = Depends(get_current_user)):
     """
     Creates a new daily chore assignment for a patient.
     """
+    if current_user["role"] != "provider":
+        raise HTTPException(status_code=403, detail="Only providers can create assignments")
     assignment = db.create_assignment(payload.model_dump())
     return {"status": "success", "assignment": assignment}
 
 @app.get("/api/assignments/{patient_id}")
-async def fetch_patient_assignments(patient_id: int):
+async def fetch_patient_assignments(patient_id: int, current_user: dict = Depends(get_current_user)):
     """
     Fetches all daily chore assignments for a patient.
     """
+    if current_user["role"] == "patient" and current_user["id"] != patient_id:
+        raise HTTPException(status_code=403, detail="Cannot view other patients' data")
     assignments = db.get_patient_assignments(patient_id)
     return assignments
 

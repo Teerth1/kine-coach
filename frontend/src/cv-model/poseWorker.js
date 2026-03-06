@@ -22,7 +22,7 @@ const ankleFilter = new JitterFilter(0.4);
  * Listens for 33 landmark points sent from the React UI's CameraFeed component.
  */
 self.onmessage = function (e) {
-    const { type, landmarks, exerciseType = 'SQUAT' } = e.data;
+    const { type, landmarks, exerciseType = 'SQUAT', thresholds } = e.data;
 
     if (type !== 'PROCESS_FRAME' || !landmarks) return;
 
@@ -35,6 +35,7 @@ self.onmessage = function (e) {
     const ankle = landmarks[28];    // Right Ankle
 
     if (exerciseType === 'SQUAT') {
+        if (thresholds) squatEngine.THRESHOLDS = { ...squatEngine.THRESHOLDS, ...thresholds };
         if (!hip || !knee || !ankle || hip.visibility < 0.5 || knee.visibility < 0.5) {
             self.postMessage({ type: 'WARNING', message: 'Leg joints obscured' });
             return;
@@ -60,6 +61,7 @@ self.onmessage = function (e) {
         }
     }
     else if (exerciseType === 'PUSHUP') {
+        if (thresholds) pushupEngine.THRESHOLDS = { ...pushupEngine.THRESHOLDS, ...thresholds };
         if (!shoulder || !elbow || !wrist || shoulder.visibility < 0.5 || elbow.visibility < 0.5) {
             self.postMessage({ type: 'WARNING', message: 'Arm joints obscured' });
             return;
@@ -84,6 +86,7 @@ self.onmessage = function (e) {
         }
     }
     else if (exerciseType === 'LUNGE') {
+        if (thresholds) lungeEngine.THRESHOLDS = { ...lungeEngine.THRESHOLDS, ...thresholds };
         if (!hip || !knee || !ankle || hip.visibility < 0.5 || knee.visibility < 0.5) {
             self.postMessage({ type: 'WARNING', message: 'Leg joints obscured' });
             return;
@@ -106,6 +109,7 @@ self.onmessage = function (e) {
         }
     }
     else if (exerciseType === 'OVERHEAD_PRESS') {
+        if (thresholds) ohpEngine.THRESHOLDS = { ...ohpEngine.THRESHOLDS, ...thresholds };
         if (!shoulder || !elbow || !wrist || shoulder.visibility < 0.5 || elbow.visibility < 0.5) {
             self.postMessage({ type: 'WARNING', message: 'Arm joints obscured' });
             return;
