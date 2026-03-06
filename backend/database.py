@@ -27,21 +27,53 @@ def _save_db(data: Dict[str, Any]) -> bool:
         print(f"Error saving to database: {e}")
         return False
 
-def calculate_adherence_score(perfect_reps: int, total_reps: int, pain_level: int) -> int:
+import statistics
+
+def calculate_adherence_score(perfect_reps: int, total_reps: int, fatigue_data: list, pain_level: int) -> dict:
     """
     Calculates the Patient Adherence Score (0-100).
-    Base logic: (Perfect / Total) * 100 - (Pain * 2). Floored at 0.
+    Based on rep depth (perfect/total), velocity (mean duration), and session consistency (std dev of duration).
     """
     if total_reps == 0:
-        return 0
+        return {"total": 0, "depth": 0, "velocity": 0, "consistency": 0}
         
-    accuracy_percentage = (perfect_reps / total_reps) * 100
-    pain_penalty = pain_level * 2
+    # 1. Rep Depth (up to 40 points)
+    accuracy_percentage = (perfect_reps / total_reps) * 40
     
-    score = int(accuracy_percentage - pain_penalty)
+    # 2. Velocity (up to 30 points)
+    # Assume ideal rep is around 3000ms - 5000ms. If average is within this, great.
+    mean_duration = statistics.mean(fatigue_data) if fatigue_data else 4000
+    if mean_duration > 6000:
+        velocity_score = max(0, int(30 - ((mean_duration - 6000) / 1000) * 5))
+    elif mean_duration < 2000:
+        velocity_score = max(0, int(30 - ((2000 - mean_duration) / 1000) * 5))
+    else:
+        velocity_score = 30
+        
+    # 3. Consistency (up to 30 points)
+    # std_dev of durations. Low is good.
+    if len(fatigue_data) > 1:
+        stdev_duration = statistics.stdev(fatigue_data)
+    else:
+        stdev_duration = 0
+        
+    if stdev_duration > 1000:
+        consistency_score = max(0, int(30 - ((stdev_duration - 1000) / 500) * 5))
+    else:
+        consistency_score = 30
+        
+    # Pain penalty
+    pain_penalty = pain_level * 5
+    
+    score = int(accuracy_percentage + velocity_score + consistency_score - pain_penalty)
     
     # Ensure the score does not dip below 0 or exceed 100 just in case.
-    return max(0, min(100, score))
+    return {
+        "total": max(0, min(100, score)),
+        "depth": int(accuracy_percentage),
+        "velocity": velocity_score,
+        "consistency": consistency_score
+    }
 
 
 def save_session(payload: dict) -> bool:
@@ -51,22 +83,24 @@ def save_session(payload: dict) -> bool:
     db = _load_db()
     
     # Calculate Score
-    adherence_score = calculate_adherence_score(
+    adherence_scores = calculate_adherence_score(
         perfect_reps=payload.get("perfect_reps", 0),
         total_reps=payload.get("total_reps_attempted", 0),
+        fatigue_data=payload.get("fatigue_data", []),
         pain_level=payload.get("pain_level", 0)
     )
     
     # Enrich the incoming payload before storing
     log_entry = {
         **payload,
-        "adherence_score": adherence_score,
+        "adherence_score": adherence_scores["total"],
+        "adherence_breakdown": adherence_scores,
         "timestamp": datetime.now().isoformat()
     }
     
     db["session_logs"].append(log_entry)
     
-    print(f"DATABASE LAYER: Saved session for patient {payload.get('patient_id')}. Score: {adherence_score}")
+    print(f"DATABASE LAYER: Saved session for patient {payload.get('patient_id')}. Score: {adherence_scores['total']}")
     return _save_db(db)
 
 def save_message(payload: dict) -> bool:
