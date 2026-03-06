@@ -171,7 +171,7 @@ export default function App() {
         initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.4 }}
         className="dashboard-layout relative z-10"
       >
-        <header className="brand-header border-none pb-0 flex-col md:flex-row gap-4 md:gap-0">
+        <header className="brand-header border-none pb-0">
           <div className="flex items-center gap-6">
             <button onClick={() => setView('landing')} className="text-text-secondary hover:text-white uppercase tracking-widest text-sm font-bold flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg border border-border-glass transition-colors">
               ← Switching Role

@@ -30,9 +30,6 @@ export class SquatStateMachine {
             perfect: 0,
             shallow: 0
         };
-
-        // Velocity & Fatigue Curve Tracking
-        this.currentRepStartTime = null;
     }
 
     /**
@@ -52,7 +49,6 @@ export class SquatStateMachine {
                 if (kneeAngle < THRESHOLDS.KNEE_SQUAT_START) {
                     this.currentState = STATES.DESCENDING;
                     this.lowestKneeAngle = kneeAngle; // Reset on new rep start
-                    this.currentRepStartTime = performance.now(); // Start the fatigue clock
                 }
                 break;
 
@@ -107,20 +103,13 @@ export class SquatStateMachine {
             this.repCount.shallow++;
         }
 
-        const repDuration = this.currentRepStartTime ? (performance.now() - this.currentRepStartTime) : 0;
-
         this.currentState = STATES.STANDING;
         this.lowestKneeAngle = 180; // Reset for next
-        this.currentRepStartTime = null;
 
         return {
             event: 'REP_COMPLETED',
             quality: quality,
-            stats: {
-                ...this.repCount,
-                durationMs: Math.round(repDuration),
-                depth: this.lowestKneeAngle
-            }
+            stats: { ...this.repCount }
         };
     }
 }

@@ -25,11 +25,11 @@ body {
 /* Layering purely semantic architectural components */
 @layer components {
   .dashboard-layout {
-    @apply flex flex-col min-h-screen p-8 max-w-7xl mx-auto;
+    @apply flex flex-col min-h-screen p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto;
   }
 
   .brand-header {
-    @apply flex justify-between items-center pb-8 border-b border-border-glass mb-8;
+    @apply flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left pb-6 md:pb-8 border-b border-border-glass mb-6 md:mb-8;
   }
 
   .patient-badge {
@@ -37,11 +37,11 @@ body {
   }
 
   .active-workout {
-    @apply grid grid-cols-1 md:grid-cols-[3fr_1fr] gap-8 flex-1;
+    @apply flex flex-col lg:grid lg:grid-cols-[3fr_1fr] gap-6 lg:gap-8 flex-1;
   }
 
   .feed-container {
-    @apply bg-bg-secondary rounded-3xl border border-border-glass overflow-hidden shadow-2xl flex items-center justify-center relative min-h-[600px];
+    @apply bg-bg-secondary rounded-3xl border border-border-glass overflow-hidden shadow-2xl flex items-center justify-center relative w-full aspect-[4/3] md:min-h-[500px] lg:h-full lg:min-h-[600px];
   }
 
   .stats-sidebar {
