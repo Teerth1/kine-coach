@@ -1,508 +1,74 @@
 @import "tailwindcss";
-
-/* Premium Kine-Coach CSS System */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap');
 
-:root {
-  --bg-color: #0d1117;
-  --bg-secondary: #161b22;
-  --brand-blue: #3b82f6;
-  --brand-green: #10b981;
-  --brand-red: #ef4444;
-  --text-primary: #f0f6fc;
-  --text-secondary: #8b949e;
-  --border-color: rgba(240, 246, 252, 0.1);
-  --glass-bg: rgba(22, 27, 34, 0.7);
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@theme {
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-brand-blue: #3b82f6;
+  --color-brand-green: #10b981;
+  --color-brand-red: #ef4444;
+  --color-text-primary: #f0f6fc;
+  --color-text-secondary: #8b949e;
+  --color-border-glass: rgba(240, 246, 252, 0.1);
+  --color-bg-glass: rgba(22, 27, 34, 0.7);
+  --font-sans: 'Outfit', sans-serif;
 }
 
 body {
-  font-family: 'Outfit', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Layout */
-.dashboard-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* Header */
-.brand-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 2rem;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 2rem;
-}
-
-.brand-header h1 {
-  font-weight: 900;
-  font-size: 2.5rem;
-  background: linear-gradient(135deg, #60a5fa, #a78bfa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -1px;
-}
-
-.patient-badge {
-  background: var(--bg-secondary);
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Active Workout (Side by Side) */
-.active-workout {
-  display: grid;
-  grid-template-columns: 3fr 1fr;
-  gap: 2rem;
-  flex: 1;
-}
-
-.feed-container {
-  background: var(--bg-secondary);
-  border-radius: 2rem;
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-/* Sidebar Stats */
-.stats-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.stats-sidebar h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-  margin-bottom: 0.5rem;
-  color: var(--text-primary);
-}
-
-.stat-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(10px);
-  border-radius: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-}
-
-.stat-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.stat-label {
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  letter-spacing: 1px;
-}
-
-.stat-value {
-  font-size: 3rem;
-  font-weight: 900;
-  line-height: 1;
-  margin-top: 0.5rem;
-}
-
-.text-blue {
-  color: var(--brand-blue);
-}
-
-.text-green {
-  color: var(--brand-green);
-}
-
-.text-red {
-  color: var(--brand-red);
-}
-
-/* Buttons */
-.finish-btn {
-  margin-top: auto;
-  background: linear-gradient(135deg, var(--brand-blue), #2563eb);
-  color: white;
-  border: none;
-  padding: 1.25rem;
-  border-radius: 1rem;
-  font-size: 1.1rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
-}
-
-.finish-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
-}
-
-.finish-btn:disabled {
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.help-text {
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-top: -0.5rem;
-}
-
-/* Post Workout Report */
-.post-workout {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.success-banner h2 {
-  font-size: 3rem;
-  font-weight: 900;
-  color: var(--brand-green);
-  margin-bottom: 1rem;
-}
-
-.report-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 1.5rem;
-  padding: 2.5rem;
-  width: 100%;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-}
-
-.report-card h3 {
-  font-size: 1.5rem;
-  color: #a78bfa;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.report-body {
-  font-size: 1.1rem;
-  line-height: 1.7;
-  color: var(--text-primary);
-  text-align: left;
-}
-
-.restart-btn {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 1rem 2rem;
-  border-radius: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.restart-btn:hover {
-  background: var(--bg-secondary);
-}
-
-/* React specific tweaks to inject our HTML classes into components cleanly */
-.relative {
-  position: relative;
-}
-
-.absolute {
-  position: absolute;
-}
-
-.z-10 {
-  z-index: 10;
-}
-
-.top-6 {
-  top: 1.5rem;
-}
-
-.left-6 {
-  left: 1.5rem;
-}
-
-.right-6 {
-  right: 1.5rem;
-}
-
-.hidden {
-  display: none;
-}
-
-.flex {
-  display: flex;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.space-x-2>*+* {
-  margin-left: 0.5rem;
-}
-
-.rounded-xl {
-  border-radius: 0.75rem;
-}
-
-.rounded-2xl {
-  border-radius: 1rem;
-}
-
-.rounded-3xl {
-  border-radius: 1.5rem;
-}
-
-.px-6 {
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-}
-
-.py-4 {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-}
-
-.p-6 {
-  padding: 1.5rem;
-}
-
-.text-white {
-  color: #fff;
-}
-
-.text-3xl {
-  font-size: 1.875rem;
-  line-height: 2.25rem;
-}
-
-.font-bold {
-  font-weight: 700;
-}
-
-.tracking-tight {
-  letter-spacing: -0.025em;
-}
-
-.mb-1 {
-  margin-bottom: 0.25rem;
-}
-
-.mb-2 {
-  margin-bottom: 0.5rem;
-}
-
-.bg-black\/50 {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-.backdrop-blur-md {
-  backdrop-filter: blur(12px);
-}
-
-.backdrop-blur-lg {
-  backdrop-filter: blur(16px);
-}
-
-.border-white\/10 {
-  border-color: rgba(255, 255, 255, 0.1);
-  border-style: solid;
-}
-
-.border-white\/20 {
-  border-color: rgba(255, 255, 255, 0.2);
-  border-style: solid;
-}
-
-.border-gray-800 {
-  border-color: #1f2937;
-  margin-right: 0px;
-}
-
-.border-4 {
-  border-width: 4px;
-}
-
-.h-3 {
-  height: 0.75rem;
-}
-
-.w-3 {
-  width: 0.75rem;
-}
-
-.h-full {
-  height: 100%;
-}
-
-.w-full {
-  width: 100%;
-}
-
-.bg-green-400 {
-  background-color: #4ade80;
-}
-
-.bg-green-500 {
-  background-color: #22c55e;
-}
-
-.text-green-400 {
-  color: #4ade80;
-}
-
-.bg-white\/10 {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.min-w-\[200px\] {
-  min-width: 200px;
-}
-
-.text-yellow-400 {
-  color: #facc15;
-}
-
-.text-gray-900 {
-  color: #111827;
-}
-
-.text-gray-300 {
-  color: #d1d5db;
-}
-
-.text-sm {
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-
-.text-2xl {
-  font-size: 1.5rem;
-  line-height: 2rem;
-}
-
-.text-5xl {
-  font-size: 3rem;
-  line-height: 1;
-}
-
-.font-semibold {
-  font-weight: 600;
-}
-
-.font-medium {
-  font-weight: 500;
-}
-
-.font-black {
-  font-weight: 900;
-}
-
-.uppercase {
-  text-transform: uppercase;
-}
-
-.tracking-wider {
-  letter-spacing: 0.05em;
-}
-
-.tracking-wide {
-  letter-spacing: 0.025em;
-}
-
-.h-px {
-  height: 1px;
-}
-
-.bg-white\/20 {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.my-4 {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-}
-
-.drop-shadow-md {
-  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.07)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.06));
-}
-
-.object-cover {
-  object-fit: cover;
-}
-
-.scale-x-\[-1\] {
-  --tw-scale-x: -1;
-  transform: scaleX(var(--tw-scale-x));
-}
-
-.inline-flex {
-  display: inline-flex;
-}
-
-.rounded-full {
-  border-radius: 9999px;
-}
-
-.opacity-75 {
-  opacity: 0.75;
-}
-
-.animate-ping {
-  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-@keyframes ping {
-
-  75%,
-  100% {
-    transform: scale(2);
-    opacity: 0;
+/* Layering purely semantic architectural components */
+@layer components {
+  .dashboard-layout {
+    @apply flex flex-col min-h-screen p-8 max-w-7xl mx-auto;
+  }
+
+  .brand-header {
+    @apply flex justify-between items-center pb-8 border-b border-border-glass mb-8;
+  }
+
+  .patient-badge {
+    @apply bg-bg-secondary px-4 py-2 rounded-full text-sm font-semibold border border-border-glass shadow-md;
+  }
+
+  .active-workout {
+    @apply grid grid-cols-1 md:grid-cols-[3fr_1fr] gap-8 flex-1;
+  }
+
+  .feed-container {
+    @apply bg-bg-secondary rounded-3xl border border-border-glass overflow-hidden shadow-2xl flex items-center justify-center relative min-h-[600px];
+  }
+
+  .stats-sidebar {
+    @apply flex flex-col gap-6;
+  }
+
+  .stat-card {
+    @apply bg-bg-glass backdrop-blur-md rounded-2xl p-6 border border-border-glass flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-xl;
+  }
+
+  .stat-row {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+  }
+
+  .stat-label {
+    @apply text-xs font-bold uppercase text-text-secondary tracking-widest;
+  }
+
+  .stat-value {
+    @apply text-5xl font-black leading-none mt-2;
+  }
+
+  .finish-btn {
+    @apply mt-auto bg-gradient-to-br from-brand-blue to-blue-700 text-white p-5 rounded-2xl text-lg font-black transition-all duration-200 shadow-xl shadow-brand-blue/40 disabled:bg-bg-secondary disabled:from-bg-secondary disabled:to-bg-secondary disabled:text-text-secondary disabled:shadow-none disabled:cursor-not-allowed hover:not-disabled:-translate-y-1 hover:not-disabled:shadow-2xl hover:not-disabled:shadow-brand-blue/50;
+  }
+
+  .report-card {
+    @apply bg-bg-secondary border border-border-glass rounded-3xl p-10 w-full shadow-2xl;
   }
 }

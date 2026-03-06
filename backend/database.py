@@ -130,3 +130,41 @@ def get_patient_sessions(patient_id: int) -> list:
     patient_logs = [log for log in logs if log.get("patient_id") == patient_id]
     
     return patient_logs
+
+def create_assignment(payload: dict) -> dict:
+    """Creates a new workout assignment "daily chore" for a patient."""
+    db = _load_db()
+    if "assignments" not in db:
+        db["assignments"] = []
+    
+    new_id = max([a.get("id", 0) for a in db["assignments"]], default=0) + 1
+    
+    assignment = {
+        "id": new_id,
+        "patient_id": payload.get("patient_id"),
+        "provider_id": payload.get("provider_id"),
+        "exercise_id": payload.get("exercise_id"),
+        "exercise_name": payload.get("exercise_name"),
+        "target_reps": payload.get("target_reps"),
+        "status": "pending",
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    db["assignments"].append(assignment)
+    _save_db(db)
+    print(f"DATABASE LAYER: Created assignment {new_id} for patient {assignment['patient_id']}")
+    return assignment
+
+def get_patient_assignments(patient_id: int) -> list:
+    db = _load_db()
+    return [a for a in db.get("assignments", []) if a.get("patient_id") == patient_id]
+
+def update_assignment_status(assignment_id: int, status: str) -> bool:
+    db = _load_db()
+    for a in db.get("assignments", []):
+        if a.get("id") == assignment_id:
+            a["status"] = status
+            _save_db(db)
+            print(f"DATABASE LAYER: Updated assignment {assignment_id} status to {status}")
+            return True
+    return False

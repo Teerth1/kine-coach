@@ -1,23 +1,35 @@
 {
-    "patients": [
-        {
-            "id": 101,
-            "name": "John Doe",
-            "assigned_exercises": [
-                1
-            ]
-        }
-    ],
-    "prescribed_exercises": [
-        {
-            "id": 1,
-            "name": "Squat",
-            "target_angles": {
-                "knee": "< 90",
-                "hip": "< 100"
-            }
-        }
-    ],
-    "session_logs": [],
-    "messages": []
+  "patients": [
+    {
+      "id": 101,
+      "name": "John Doe",
+      "assigned_exercises": [
+        1
+      ]
+    }
+  ],
+  "prescribed_exercises": [
+    {
+      "id": 1,
+      "name": "Squat",
+      "target_angles": {
+        "knee": "< 90",
+        "hip": "< 100"
+      }
+    }
+  ],
+  "session_logs": [],
+  "messages": [],
+  "assignments": [
+    {
+      "id": 1,
+      "patient_id": 101,
+      "provider_id": 999,
+      "exercise_id": 1,
+      "exercise_name": "Squat",
+      "target_reps": 5,
+      "status": "completed",
+      "timestamp": "2026-03-05T20:00:00.000000"
+    }
+  ]
 }
