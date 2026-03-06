@@ -2,12 +2,20 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Camera } from '@mediapipe/camera_utils';
 import { Pose, POSE_CONNECTIONS } from '@mediapipe/pose';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
+import { playSuccessDing, playErrorBuzzer } from '../utils/audioGamification';
 
-export default function CameraFeed({ onRepCompleted }) {
+export default function CameraFeed({ onRepCompleted, exerciseType = 'SQUAT' }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const workerRef = useRef(null);
     const [trackingData, setTrackingData] = useState({ kneeAngle: 0, hipAngle: 0, phase: 'STANDING' });
+
+    // Ticket 5.3: Onboarding modal — shows once until the patient clicks "Got it!"
+    const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('kinecoach_onboarded'));
+
+    // Ticket 6.3: Form warning toast — auto-cleared after 2.5s
+    const [warningMsg, setWarningMsg] = useState(null);
+    const warningTimerRef = useRef(null);
 
     useEffect(() => {
         // 1. Initialize the AI Web Worker instance
@@ -16,11 +24,21 @@ export default function CameraFeed({ onRepCompleted }) {
         workerRef.current.onmessage = (e) => {
             const data = e.data;
             if (data.type === 'TRACKING_UPDATE') {
-                // Update local React state with the latest knee and hip angles from the physics engine
-                setTrackingData({ kneeAngle: Math.round(data.angles.knee), hipAngle: Math.round(data.angles.hip), phase: data.phase });
+                setTrackingData({ kneeAngle: Math.round(data.angles.knee || data.angles.elbow || data.angles.shoulder || 0), hipAngle: Math.round(data.angles.hip || 0), phase: data.phase });
             } else if (data.type === 'REP_COMPLETED') {
+                // 🔊 Play audio feedback based on rep quality!
+                if (data.quality === 'PERFECT') {
+                    playSuccessDing();
+                } else {
+                    playErrorBuzzer();
+                }
                 // Fire event up to parent Dashboard with stats (Perfect vs Shallow)
                 if (onRepCompleted) onRepCompleted(data);
+            } else if (data.type === 'WARNING') {
+                // ⚠️ Show form correction warning toast (clears automatically after 2.5s)
+                setWarningMsg(data.message);
+                if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+                warningTimerRef.current = setTimeout(() => setWarningMsg(null), 2500);
             }
         };
 
@@ -60,10 +78,11 @@ export default function CameraFeed({ onRepCompleted }) {
                 drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
                 drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 2, radius: 4 });
 
-                // B. Send the raw 3D coordinates to our Web Worker (poseWorker.js) so the math math doesn't lag the UI!
+                // B. Send the raw 3D coordinates + exercise type to the Web Worker
                 workerRef.current.postMessage({
                     type: 'PROCESS_FRAME',
-                    landmarks: results.poseLandmarks
+                    landmarks: results.poseLandmarks,
+                    exerciseType: exerciseType,
                 });
             }
             ctx.restore();
@@ -89,6 +108,34 @@ export default function CameraFeed({ onRepCompleted }) {
 
     return (
         <div className="relative w-full max-w-4xl mx-auto rounded-3xl overflow-hidden shadow-2xl bg-gray-900 border-4 border-gray-800 group">
+
+            {/* 👋 Ticket 5.3: First-Time Onboarding Overlay */}
+            {showOnboarding && (
+                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
+                    <div className="text-6xl mb-4">🦷</div>
+                    <h2 className="text-white text-3xl font-black mb-3">Get in Position!</h2>
+                    <p className="text-gray-300 text-lg mb-6 max-w-sm">
+                        Stand <strong>4–5 feet</strong> from your camera.<br />
+                        Face it <strong>directly</strong>, keep your <strong>full body visible</strong>.
+                    </p>
+                    <div className="text-5xl mb-6">🧘</div>
+                    <p className="text-gray-400 text-sm mb-8">Make sure your <strong className="text-white">knees, hips, and shoulders</strong> are all in the frame.</p>
+                    <button
+                        onClick={() => { localStorage.setItem('kinecoach_onboarded', 'true'); setShowOnboarding(false); }}
+                        className="bg-brand-blue hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-200 shadow-xl shadow-brand-blue/40 hover:-translate-y-1"
+                    >
+                        👍 Got it, let’s go!
+                    </button>
+                </div>
+            )}
+
+            {/* ⚠️ Ticket 6.3: Form Correction Warning Toast */}
+            {warningMsg && (
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-red-600/90 backdrop-blur-md text-white font-bold px-6 py-3 rounded-2xl shadow-2xl border border-red-400/50 text-sm animate-pulse">
+                    {warningMsg}
+                </div>
+            )}
+
             {/* Absolute Header Overlay */}
             <div className="absolute top-6 left-6 z-10 bg-black/50 backdrop-blur-md rounded-xl px-6 py-4 border border-white/10">
                 <h2 className="text-white text-3xl font-bold tracking-tight mb-1">Live Engine</h2>

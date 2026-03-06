@@ -22,6 +22,7 @@ export default function App() {
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [clinicalReport, setClinicalReport] = useState(null);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [exerciseType, setExerciseType] = useState('SQUAT'); // Active exercise mode
 
   // Daily Chores State
   const [assignments, setAssignments] = useState([]);
@@ -187,8 +188,23 @@ export default function App() {
         {!sessionCompleted ? (
           <main className="active-workout">
             <section className="feed-container">
+              {/* Exercise Mode Switcher */}
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex gap-2 bg-black/60 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-xl">
+                {[['SQUAT', '🦵 Squat'], ['PUSHUP', '💪 Pushup'], ['LUNGE', '🏃 Lunge'], ['OVERHEAD_PRESS', '🙌 OHP'], ['BICEP_CURL', '💪 Curl'], ['SHOULDER_ABDUCTION', '🙋 Lateral']].map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setExerciseType(key)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${exerciseType === key
+                      ? 'bg-brand-blue text-white shadow-lg shadow-brand-blue/40 scale-105'
+                      : 'text-gray-400 hover:text-white hover:bg-white/10'
+                      }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               {/* The Computer Vision & Camera Module */}
-              <CameraFeed onRepCompleted={handleRepCompleted} />
+              <CameraFeed onRepCompleted={handleRepCompleted} exerciseType={exerciseType} />
             </section>
 
             <aside className="stats-sidebar">

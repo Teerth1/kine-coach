@@ -13,10 +13,11 @@ export const STATES = {
 
 // Thresholds based on general PT norms
 const THRESHOLDS = {
-    KNEE_STANDING: 160,     // Almost straight
+    KNEE_STANDING: 160,
     HIP_STANDING: 160,
-    KNEE_SQUAT_PERFECT: 90, // Knee bent deep enough
-    KNEE_SQUAT_START: 130   // Started bending
+    KNEE_SQUAT_PERFECT: 90,   // Knee bent deep enough for a perfect rep
+    KNEE_SQUAT_START: 120,   // Lowered from 130 — avoids jitter false-triggers
+    KNEE_MIN_DEPTH: 140,   // Anti-phantom gate: discard rep if knee never bent this far
 };
 
 export class SquatStateMachine {
@@ -39,8 +40,9 @@ export class SquatStateMachine {
      * @returns {Object|null} If a rep is finished, returns event details.
      */
     update(kneeAngle, hipAngle) {
-        // Track the absolute deepest point of their squat for grading
-        if (kneeAngle < this.lowestKneeAngle) {
+        // Only track depth while actively squatting — scoping prevents standing jitter from poisoning rep grade
+        if ((this.currentState === STATES.DESCENDING || this.currentState === STATES.BOTTOM) &&
+            kneeAngle < this.lowestKneeAngle) {
             this.lowestKneeAngle = kneeAngle;
         }
 
@@ -92,6 +94,13 @@ export class SquatStateMachine {
      * Private inside function to grade the rep and reset for the next one.
      */
     _gradeAndResetRep() {
+        // 🛡️ Anti-phantom gate: if the knee barely bent (pure jitter cycle), silently reset without counting
+        if (this.lowestKneeAngle >= THRESHOLDS.KNEE_MIN_DEPTH) {
+            this.currentState = STATES.STANDING;
+            this.lowestKneeAngle = 180;
+            return { event: 'TRACKING', phase: STATES.STANDING, currentKnee: 180 };
+        }
+
         this.repCount.total++;
         let quality = 'SHALLOW';
 

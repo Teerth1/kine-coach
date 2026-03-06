@@ -3,12 +3,16 @@ import { SquatStateMachine } from './stateMachine.js';
 import { PushupStateMachine } from './pushupStateMachine.js';
 import { LungeStateMachine } from './lungeStateMachine.js';
 import { OverheadPressStateMachine } from './overheadPressStateMachine.js';
+import { BicepCurlStateMachine } from './bicepCurlStateMachine.js';
+import { ShoulderAbductionStateMachine } from './shoulderAbductionStateMachine.js';
 
 // Initialize all tracking engines
 const squatEngine = new SquatStateMachine();
 const pushupEngine = new PushupStateMachine();
 const lungeEngine = new LungeStateMachine();
 const ohpEngine = new OverheadPressStateMachine();
+const bicepCurlEngine = new BicepCurlStateMachine();
+const shoulderAbdEngine = new ShoulderAbductionStateMachine();
 
 // Initialize the Jitter Smoothing Filters (one per joint angle tracked)
 const kneeFilter = new JitterFilter(0.4);
@@ -120,6 +124,57 @@ self.onmessage = function (e) {
             type: 'TRACKING_UPDATE',
             angles: { elbow: elbowAngle },
             phase: ohpEngine.currentState
+        });
+
+        if (result && result.event === 'REP_COMPLETED') {
+            self.postMessage({ type: 'REP_COMPLETED', quality: result.quality, stats: result.stats });
+        }
+    }
+    else if (exerciseType === 'BICEP_CURL') {
+        if (!shoulder || !elbow || !wrist || shoulder.visibility < 0.5 || elbow.visibility < 0.5) {
+            self.postMessage({ type: 'WARNING', message: 'Arm joints obscured — step back so your full arm is visible' });
+            return;
+        }
+
+        // The elbow angle (shoulder → elbow → wrist) is the primary signal
+        const rawElbowAngle = calculateAngle(shoulder, elbow, wrist);
+        const elbowAngle = elbowFilter.filter(rawElbowAngle);
+
+        const result = bicepCurlEngine.update(elbowAngle);
+
+        self.postMessage({
+            type: 'TRACKING_UPDATE',
+            angles: { elbow: elbowAngle },
+            phase: bicepCurlEngine.currentState
+        });
+
+        if (result && result.event === 'REP_COMPLETED') {
+            self.postMessage({ type: 'REP_COMPLETED', quality: result.quality, stats: result.stats });
+        }
+
+        // 🛡️ Ticket 6.3: Back-arch cheat detection
+        // If the shoulder is significantly behind the hip horizontally, the patient is leaning back!
+        const torsoLeanBack = hip.x - shoulder.x; // Positive = shoulder behind hip = leaning back
+        if (torsoLeanBack > 0.06) { // > 6% of frame width = clear lean
+            self.postMessage({ type: 'WARNING', message: '⚠️ Keep your back straight! You\'re leaning back.' });
+        }
+    }
+    else if (exerciseType === 'SHOULDER_ABDUCTION') {
+        if (!hip || !shoulder || !elbow || shoulder.visibility < 0.5 || elbow.visibility < 0.5) {
+            self.postMessage({ type: 'WARNING', message: 'Upper body not visible — step back from the camera' });
+            return;
+        }
+
+        // Angle at the shoulder: hip → shoulder → elbow
+        const rawShoulderAngle = calculateAngle(hip, shoulder, elbow);
+        const shoulderAngle = shoulderFilter.filter(rawShoulderAngle);
+
+        const result = shoulderAbdEngine.update(shoulderAngle);
+
+        self.postMessage({
+            type: 'TRACKING_UPDATE',
+            angles: { shoulder: shoulderAngle },
+            phase: shoulderAbdEngine.currentState
         });
 
         if (result && result.event === 'REP_COMPLETED') {
