@@ -20,3 +20,13 @@ class ProviderMessage(BaseModel):
     provider_id: int = Field(..., description="ID of the provider sending the message")
     patient_id: int = Field(..., description="ID of the patient receiving the message")
     message_body: str = Field(..., description="Content of the message")
+
+class AssignmentCreate(BaseModel):
+    patient_id: int = Field(..., description="ID of the patient receiving the assignment")
+    provider_id: int = Field(..., description="ID of the provider creating the assignment")
+    exercise_id: int = Field(..., description="ID of the assigned exercise")
+    exercise_name: str = Field(..., description="Name of the assigned exercise")
+    target_reps: int = Field(..., description="Number of reps the patient needs to complete")
+
+class AssignmentStatusUpdate(BaseModel):
+    status: str = Field(..., description="Status of the assignment (e.g., 'completed')")

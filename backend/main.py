@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from schemas import ExerciseTarget, SessionPayload, ProviderMessage
+from schemas import ExerciseTarget, SessionPayload, ProviderMessage, AssignmentCreate, AssignmentStatusUpdate
 import database as db
 from fpdf import FPDF
 
@@ -171,3 +171,30 @@ async def generate_pdf_summary(patient_id: int):
     pdf_content = pdf.output(dest='S').encode('latin1')
     
     return Response(content=pdf_content, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=patient_{patient_id}_summary.pdf"})
+
+
+@app.post("/api/assignments")
+async def create_assignment(payload: AssignmentCreate):
+    """
+    Creates a new daily chore assignment for a patient.
+    """
+    assignment = db.create_assignment(payload.model_dump())
+    return {"status": "success", "assignment": assignment}
+
+@app.get("/api/assignments/{patient_id}")
+async def fetch_patient_assignments(patient_id: int):
+    """
+    Fetches all daily chore assignments for a patient.
+    """
+    assignments = db.get_patient_assignments(patient_id)
+    return assignments
+
+@app.post("/api/assignments/{assignment_id}/status")
+async def update_assignment_status(assignment_id: int, payload: AssignmentStatusUpdate):
+    """
+    Updates the completion status of a specific assignment.
+    """
+    success = db.update_assignment_status(assignment_id, payload.status)
+    if not success:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return {"status": "success"}

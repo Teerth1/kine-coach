@@ -1,3 +1,5 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export default function ProviderDashboard() {
@@ -153,10 +155,10 @@ export default function ProviderDashboard() {
     });
 
     return (
-        <div className="w-full flex flex-col gap-6 animate-fade-in relative z-10">
+        <motion.div initial="hidden" animate="visible" variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } }} className="w-full flex flex-col gap-6 relative z-10">
 
             {/* Top Header & Patient Selection Row */}
-            <div className="flex justify-between items-center bg-gray-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-md">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="flex flex-col md:flex-row justify-between items-center bg-bg-glass p-6 rounded-3xl border border-border-glass shadow-xl">
                 <div>
                     <h2 className="text-3xl font-black text-white tracking-tight">Clinician Portal</h2>
                     <p className="text-gray-400 mt-1">Reviewing telemetry from computer vision engine</p>
@@ -175,7 +177,7 @@ export default function ProviderDashboard() {
                         <option value={102}>Patient 102 (Jane Smith)</option>
                     </select>
                 </div>
-            </div>
+            </motion.div>
 
             {loading ? (
                 <div className="h-64 flex items-center justify-center">
@@ -188,13 +190,13 @@ export default function ProviderDashboard() {
             ) : (
                 <>
                     {/* Key Metrics Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="stat-card" title={scoreTooltip}>
                             <p className="stat-label border-b border-gray-700/50 pb-2 mb-2">Last Session Score ⓘ</p>
                             <div className="flex items-center justify-center gap-3">
-                                <p className="stat-value text-blue">{lastScore}%</p>
+                                <p className="stat-value text-brand-blue">{lastScore}%</p>
                                 {scoreTrend !== 0 && (
-                                    <span className={`text-sm font-bold px-2 py-1 rounded-full ${scoreTrend > 0 ? 'bg-green-500/20 text-emerald-400' : 'bg-red-500/20 text-rose-400'}`}>
+                                    <span className={`text-sm font-bold px-2 py-1 rounded-full ${scoreTrend > 0 ? 'bg-brand-green/20 text-emerald-400' : 'bg-brand-red/20 text-rose-400'}`}>
                                         {scoreTrend > 0 ? '⬆️' : '⬇️'} {Math.abs(scoreTrend)}%
                                     </span>
                                 )}
@@ -202,16 +204,16 @@ export default function ProviderDashboard() {
                         </div>
                         <div className="stat-card">
                             <p className="stat-label">All-Time Reps</p>
-                            <p className="stat-value text-green">{totalCompleted}</p>
+                            <p className="stat-value text-brand-green">{totalCompleted}</p>
                         </div>
                         <div className="stat-card">
                             <p className="stat-label">Avg Reported Pain</p>
-                            <p className="stat-value text-red">{averagePain} / 10</p>
+                            <p className="stat-value text-brand-red">{averagePain} / 10</p>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Adherence Graph */}
-                    <div className="bg-gray-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-md h-[400px]">
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-bg-glass p-6 rounded-3xl border border-border-glass shadow-xl h-[400px]">
                         <h3 className="text-xl font-bold text-white mb-6">Patient Adherence Trend</h3>
                         <ResponsiveContainer width="100%" height="85%">
                             <LineChart data={sessions} margin={{ top: 5, right: 30, left: -20, bottom: 5 }}>
@@ -232,10 +234,10 @@ export default function ProviderDashboard() {
                                 />
                             </LineChart>
                         </ResponsiveContainer>
-                    </div>
+                    </motion.div>
 
                     {/* Messaging Widget */}
-                    <div className="bg-gray-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-md flex flex-col gap-4">
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-bg-glass p-6 rounded-3xl border border-border-glass shadow-xl flex flex-col gap-4">
                         <h3 className="text-xl font-bold text-white">Direct Message Patient {patientId}</h3>
                         <p className="text-gray-400 text-sm">Send encouragement, adjust rep targets, or notify them of physical therapy plan updates.</p>
                         <textarea
@@ -253,10 +255,10 @@ export default function ProviderDashboard() {
                                 Send to Patient
                             </button>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Fatigue Curve Graph (Feature 4 Analytics) */}
-                    <div className="bg-gray-900/50 p-6 rounded-2xl border border-rose-500/20 backdrop-blur-md h-[400px]">
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-bg-glass p-6 rounded-3xl border border-rose-500/20 shadow-xl h-[400px]">
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h3 className="text-xl font-bold text-rose-400 mb-2">Fatigue Curve</h3>
@@ -288,10 +290,10 @@ export default function ProviderDashboard() {
                                 />
                             </LineChart>
                         </ResponsiveContainer>
-                    </div>
+                    </motion.div>
 
                     {/* Range of Motion Widget (Ticket 3.2) */}
-                    <div className="bg-gray-900/50 p-6 rounded-2xl border border-emerald-500/20 backdrop-blur-md h-[400px]">
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-bg-glass p-6 rounded-3xl border border-emerald-500/20 shadow-xl h-[400px]">
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h3 className="text-xl font-bold text-emerald-400 mb-2">Range of Motion (ROM) Improvement</h3>
@@ -319,9 +321,9 @@ export default function ProviderDashboard() {
                                 />
                             </LineChart>
                         </ResponsiveContainer>
-                    </div>
+                    </motion.div>
                 </>
             )}
-        </div>
+        </motion.div>
     );
 }
