@@ -1,11 +1,24 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import ExerciseTarget, SessionPayload, ProviderMessage
-import database as db
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
+import json
+
+from schemas import (
+    ExerciseTarget, SessionPayload, ProviderMessage, 
+    UserCreate, UserResponse, Token, 
+    WorkoutAssignmentCreate, WorkoutAssignmentResponse
+)
+import models
+import crud
+import auth
+from database import engine, get_db
+
+# Create all database tables
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Kine-Coach API")
 
-# Configure CORS to allow all origins as requested
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,17 +27,79 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- AUTH ROUTES ---
+
+@app.post("/signup", response_model=UserResponse)
+def signup(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = auth.get_password_hash(user.password)
+    new_user = models.User(
+        email=user.email,
+        hashed_password=hashed_password,
+        role=user.role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+@app.post("/login", response_model=Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = auth.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# --- WORKOUT ASSIGNMENT ROUTES ---
+
+@app.post("/api/workouts/assign", response_model=WorkoutAssignmentResponse)
+def assign_workout(
+    assignment: WorkoutAssignmentCreate, 
+    db: Session = Depends(get_db),
+    current_provider: models.User = Depends(auth.get_current_provider)
+):
+    """
+    Ticket 2.4: Build a 'Workout Assignments API'
+    Provider pushes Daily Chores to patient's app.
+    """
+    new_assignment = models.WorkoutAssignment(
+        provider_id=current_provider.id,
+        patient_id=assignment.patient_id,
+        exercise_id=assignment.exercise_id,
+        target_angles_json=json.dumps(assignment.target_angles)
+    )
+    db.add(new_assignment)
+    db.commit()
+    db.refresh(new_assignment)
+    return new_assignment
+
+@app.get("/api/workouts/me", response_model=list[WorkoutAssignmentResponse])
+def get_my_workouts(
+    db: Session = Depends(get_db),
+    current_patient: models.User = Depends(auth.get_current_patient)
+):
+    """
+    Ticket 2.4: Patient fetches their assigned Daily Chores.
+    """
+    assignments = db.query(models.WorkoutAssignment).filter(
+        models.WorkoutAssignment.patient_id == current_patient.id
+    ).all()
+    return assignments
+
+# --- EXISTING ROUTES (Migrated & Protected) ---
+
 @app.get("/api/exercises/{exercise_id}", response_model=ExerciseTarget)
 async def get_exercise_target(exercise_id: int):
-    """
-    Returns dummy target angle data to inject into the frontend AI.
-    Throws a 404 error if the exercise ID is not found.
-    """
-    # For now, we only have dummy data for exercise_id 1 (Squat)
     if exercise_id != 1:
-        print(f"Error: Exercise {exercise_id} not found.")
         raise HTTPException(status_code=404, detail="Exercise not found")
-        
     dummy_data = {
         "exercise_id": exercise_id,
         "name": "Squat",
@@ -33,27 +108,19 @@ async def get_exercise_target(exercise_id: int):
             "hip": "< 100"
         }
     }
-    print(f"Returning dummy data for exercise_id: {exercise_id}")
     return dummy_data
 
 from google import genai
 import os
 from dotenv import load_dotenv
-from fastapi import HTTPException
 
-# Load environment variables from .env
 load_dotenv()
-
-# Initialize Gemini Client
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+client_key = os.environ.get("GEMINI_API_KEY", "")
+client = genai.Client(api_key=client_key) if client_key and client_key != "INSERT_YOUR_GEMINI_API_KEY_HERE" else None
 
 async def generate_gemini_report(payload: SessionPayload) -> str:
-    """
-    Uses the Gemini API to generate a clinical 'future improvements' report.
-    """
-    if not os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") == "INSERT_YOUR_GEMINI_API_KEY_HERE":
+    if client is None:
          return "Warning: GEMINI_API_KEY not set. This is a fallback mock report."
-         
     prompt = (
         f"You are a clinical AI assistant for a physical therapy app called Kine-Coach.\n"
         f"A patient just finished their session. Please write a short (2-3 sentences max) "
@@ -65,11 +132,9 @@ async def generate_gemini_report(payload: SessionPayload) -> str:
         f"- Fatigue Data (Time per rep in sec): {payload.fatigue_data}\n"
         f"- Pain Level (0-10): {payload.pain_level}\n"
         f"- Patient Quiz Feedback: '{payload.quiz_answers}'\n\n"
-        f"Keep the tone professional, objective, and actionable for a physical therapist."
+        f"Keep the tone professional."
     )
-    
     try:
-        # Use gemini-2.5-flash as requested, fully async!
         response = await client.aio.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
@@ -77,45 +142,37 @@ async def generate_gemini_report(payload: SessionPayload) -> str:
         return response.text
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate AI report.")
+        return "Warning: Gemini API Error occurred. Mock report fallback."
 
 @app.post("/api/sessions")
-async def process_session(payload: SessionPayload):
-    """
-    Receives the SessionPayload, prints it, and returns the Gemini AI summary.
-    """
-    # Print the received payload to the console
+async def process_session(
+    payload: SessionPayload,
+    db: Session = Depends(get_db),
+    current_patient: models.User = Depends(auth.get_current_patient) # Only patients submit sessions
+):
     print(f"Received SessionPayload: {payload.model_dump()}")
-    
-    # Hand off to Database Engineer's layer
-    db.save_session(payload.model_dump())
-    
-    # Generate the actual Gemini report
+    crud.save_session(db, payload)
     report = await generate_gemini_report(payload)
-    
     return {"status": "success", "report": report}
 
 @app.post("/api/messages")
-async def send_message(payload: ProviderMessage):
-    """
-    Receives the ProviderMessage payload, prints it, and returns a success status.
-    """
-    # Print the received payload to the console
+async def send_message(
+    payload: ProviderMessage,
+    db: Session = Depends(get_db),
+    current_provider: models.User = Depends(auth.get_current_provider) # Only providers send messages
+):
     print(f"Received ProviderMessage: {payload.model_dump()}")
-    
-    # Hand off to Database Engineer's layer
-    db.save_message(payload.model_dump())
-    
+    crud.save_message(db, payload)
     return {"status": "success", "message": "Message received"}
 
 @app.get("/api/sessions/{patient_id}")
-async def fetch_patient_sessions(patient_id: int):
-    """
-    Returns an array of historical workout sessions for the dashboard chart.
-    """
-    sessions = db.get_patient_sessions(patient_id)
-    if not sessions:
-        # Return an empty list instead of a 404 so the UI can gracefully show "No Data"
-        return []
+async def fetch_patient_sessions(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user) # Provider checking patient OR patient checking self
+):
+    if current_user.role == "patient" and current_user.id != patient_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view other patient logs")
         
+    sessions = crud.get_patient_sessions(db, patient_id)
     return sessions

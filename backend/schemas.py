@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 class ExerciseTarget(BaseModel):
     exercise_id: int = Field(..., description="Unique identifier for the exercise")
@@ -19,3 +20,36 @@ class ProviderMessage(BaseModel):
     provider_id: int = Field(..., description="ID of the provider sending the message")
     patient_id: int = Field(..., description="ID of the patient receiving the message")
     message_body: str = Field(..., description="Content of the message")
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    role: str = Field(..., description="'patient' or 'provider'")
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    role: str
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class WorkoutAssignmentCreate(BaseModel):
+    patient_id: int
+    exercise_id: int
+    target_angles: Dict[str, Any]
+
+class WorkoutAssignmentResponse(BaseModel):
+    id: int
+    provider_id: int
+    patient_id: int
+    exercise_id: int
+    target_angles_json: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
